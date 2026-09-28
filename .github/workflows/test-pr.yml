@@ -1,8 +1,6 @@
 name: Test Pull Request
 
 on:
-  push:
-    branches: [complete-package]
   workflow_dispatch:
   pull_request:
     paths:
