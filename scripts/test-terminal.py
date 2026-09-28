@@ -14,7 +14,8 @@ import termios
 import time
 
 binary = str(Path(sys.argv[1]).resolve())
-with tempfile.TemporaryDirectory(prefix='codex-terminal-') as temporary:
+# macOS's default temporary path exceeds the Unix socket path limit.
+with tempfile.TemporaryDirectory(prefix='codex-', dir='/tmp') as temporary:
     home = Path(temporary)
     env = dict(os.environ, HOME=temporary, CODEX_HOME=temporary, TERM='xterm-256color')
     (home / 'auth.json').write_text('{"OPENAI_API_KEY":"test-api-key"}\n')
@@ -22,9 +23,11 @@ with tempfile.TemporaryDirectory(prefix='codex-terminal-') as temporary:
         '[projects.' + json.dumps(temporary) + ']\ntrust_level = "trusted"\n')
 
     def daemon(*args):
-        return subprocess.run([binary, 'app-server', 'daemon', *args],
+        result = subprocess.run([binary, 'app-server', 'daemon', *args],
                               env=env, cwd=home, capture_output=True, text=True,
-                              timeout=90, check=True)
+                              timeout=90)
+        assert result.returncode == 0, result.stderr
+        return result
 
     pid, fd = pty.fork()
     if pid == 0:
