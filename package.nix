@@ -37,13 +37,7 @@ let
   platform = platformMap.${stdenv.hostPlatform.system} or null;
   nodePlatform = nodePlatformMap.${stdenv.hostPlatform.system} or null;
 
-  # The complete package, not the bare `codex-<platform>` binary. A session in
-  # a terminal starts Codex's background server, which Codex installs by
-  # copying the package it is running from; it recognises that package by
-  # `codex-package.json` beside the `bin/` its executable sits in, and requires
-  # `bin/codex-code-mode-host`, `codex-path/rg` and (Linux)
-  # `codex-resources/bwrap` in it. Without them the session fails to start with
-  # "this CLI has no complete local package".
+  # Daemon bootstrap copies this complete package, including its manifest.
   nativeHashes = {
     "aarch64-apple-darwin" = "147m6b7nq6gdpnv4fml0yiw0d4wh3c68bd0m9wwcvyqqwgyskwh9";
     "x86_64-apple-darwin" = "05sbs9gqnhwqg108z4dynvjcy752088azb734df96bifsnj8g9j6";
@@ -149,10 +143,7 @@ stdenv.mkDerivation rec {
     runHook preInstall
     mkdir -p $out/bin $out/lib
 
-    # The package keeps the layout it was released in, and Codex runs from
-    # inside it: the executable's own `bin/` is how Codex finds the rest. Its
-    # basename stays `codex` for process discovery, whatever the wrapper is
-    # called, and the code-mode host stays next to it.
+    # Codex discovers its package from bin/ and the adjacent manifest.
     cp -r build $out/lib/codex
     ln -s ../lib/codex/bin/codex-code-mode-host $out/bin/codex-code-mode-host
     makeWrapper "$out/lib/codex/bin/codex" "$out/bin/${selected.binName}" \
