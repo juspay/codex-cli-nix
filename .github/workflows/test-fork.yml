@@ -1,0 +1,68 @@
+name: Fork Package Checks
+
+# Fork-only validation; exclude this file from the upstream packaging patch.
+on:
+  workflow_dispatch:
+  push:
+    branches: [complete-package]
+
+
+jobs:
+  test-build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+        env:
+          NIX_FIRST_BUILD_UID: 400
+
+      - name: Setup Nix cache
+        uses: cachix/cachix-action@v15
+        with:
+          name: codex-cli
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          skipPush: true
+
+      - name: Build package
+        run: |
+          args=()
+          # Unstable Nixpkgs dropped Intel macOS; test the release with 26.05.
+          if [ "${{ matrix.os }}" = macos-15-intel ]; then
+            args=(--override-input nixpkgs github:NixOS/nixpkgs/04f2338dd72b93278448fb3e3e5cd71af207edb9 --no-write-lock-file)
+          fi
+          nix build .#codex "${args[@]}" --print-build-logs
+          nix build .#codex-node "${args[@]}" --no-link --print-build-logs
+          
+      - name: Test codex version
+        run: |
+          # Test that codex runs and reports version
+          ./result/bin/codex --version
+          
+      - name: Verify package contents
+        run: |
+          test -f ./result/bin/codex
+          test -x ./result/bin/codex-code-mode-host
+          test -x ./result/lib/codex/bin/codex
+          test -x ./result/lib/codex/bin/codex-code-mode-host
+          test -f ./result/lib/codex/codex-package.json
+          test -L ./result/bin/codex-code-mode-host
+
+      - name: Run basic functionality test
+        run: |
+          ./result/bin/codex --help || true
+          ./result/bin/codex --version 2>&1 | grep -E "codex|Codex"
+
+      - name: Test terminal daemon bootstrap
+        run: python3 scripts/test-terminal.py ./result/bin/codex
+
