@@ -39,8 +39,13 @@ jobs:
 
       - name: Build package
         run: |
-          nix build .#codex --print-build-logs
-          nix build .#codex-node --no-link --print-build-logs
+          args=()
+          # Unstable Nixpkgs dropped Intel macOS; test the release with 26.05.
+          if [ "${{ matrix.os }}" = macos-15-intel ]; then
+            args=(--override-input nixpkgs github:NixOS/nixpkgs/04f2338dd72b93278448fb3e3e5cd71af207edb9 --no-write-lock-file)
+          fi
+          nix build .#codex "${args[@]}" --print-build-logs
+          nix build .#codex-node "${args[@]}" --no-link --print-build-logs
           
       - name: Test codex version
         run: |
